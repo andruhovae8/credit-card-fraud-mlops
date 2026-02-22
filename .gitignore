@@ -1,10 +1,19 @@
-__pycache__/
-*.py[cod]
+# virtual env
 venv/
-.env
 
-data/
-models/
-.ipynb_checkpoints/
+# mac
+.DS_Store
+
+# mlflow
 mlruns/
-.trash/
+mlflow.db
+
+# data
+data/
+
+# python cache
+__pycache__/
+*.pyc
+
+# images 
+*.png
