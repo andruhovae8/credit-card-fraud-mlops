@@ -9,7 +9,7 @@ stages:
       - data/prepared/test.csv
 
   train:
-    cmd: python src/train.py --train_path data/prepared/train.csv --test_path data/prepared/test.csv --target Class --model rf --imbalance none --run_name dvc_rf_baseline --max_depth 9 --n_estimators 300
+    cmd: python src/train.py --train_path data/prepared/train.csv --test_path data/prepared/test.csv --target Class --model rf --imbalance none --run_name dvc_rf_baseline --max_depth 12 --n_estimators 300
     deps:
       - data/prepared/train.csv
       - data/prepared/test.csv

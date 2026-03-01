@@ -24,7 +24,7 @@ stages:
   train:
     cmd: python src/train.py --train_path data/prepared/train.csv --test_path 
       data/prepared/test.csv --target Class --model rf --imbalance none 
-      --run_name dvc_rf_baseline --max_depth 9 --n_estimators 300
+      --run_name dvc_rf_baseline --max_depth 12 --n_estimators 300
     deps:
     - path: data/prepared/test.csv
       hash: md5
@@ -41,5 +41,5 @@ stages:
     outs:
     - path: models/model.pkl
       hash: md5
-      md5: a7db902d199c0bd18fbd91ffbc092f92
-      size: 2708121
+      md5: 8c044b91bc20314dda5bcf9966e3b051
+      size: 3846521
