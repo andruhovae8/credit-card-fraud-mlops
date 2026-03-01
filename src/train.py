@@ -1,17 +1,15 @@
 import argparse
-import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import joblib
 
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     precision_score, recall_score, f1_score,
     roc_auc_score, average_precision_score,
     confusion_matrix, ConfusionMatrixDisplay, precision_recall_curve
 )
 from sklearn.preprocessing import RobustScaler
-from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 
@@ -22,13 +20,10 @@ import mlflow.sklearn
 def parse_args():
     p = argparse.ArgumentParser()
 
-    # data
-    p.add_argument("--data_path", type=str, default="data/raw/creditcard.csv")
+    # prepared data (from DVC prepare stage)
+    p.add_argument("--train_path", type=str, default="data/prepared/train.csv")
+    p.add_argument("--test_path", type=str, default="data/prepared/test.csv")
     p.add_argument("--target", type=str, default="Class")
-
-    # split
-    p.add_argument("--test_size", type=float, default=0.2)
-    p.add_argument("--random_state", type=int, default=42)
 
     # preprocessing
     p.add_argument("--scale_time_amount", action="store_true",
@@ -52,20 +47,18 @@ def parse_args():
     p.add_argument("--C", type=float, default=1.0)
     p.add_argument("--max_iter", type=int, default=1000)
 
-    # XGB / LGBM basic params 
+    # XGB / LGBM basic params
     p.add_argument("--learning_rate", type=float, default=0.1)
 
     # threshold
     p.add_argument("--threshold", type=float, default=0.5,
                    help="Decision threshold for converting proba -> class")
     p.add_argument("--tune_threshold", action="store_true",
-                   help="Tune threshold on TRAIN set by maximizing F2-score. Logs best_threshold.")
+                   help="Tune threshold on TRAIN (used) set by maximizing F2-score. Logs best_threshold.")
 
-    # SHAP
-    p.add_argument("--shap", action="store_true",
-                   help="Compute SHAP summary plot for tree models (small sample) and log as artifact")
-    p.add_argument("--shap_sample", type=int, default=1000,
-                   help="Sample size for SHAP (keep small)")
+    # SHAP (optional)
+    p.add_argument("--shap", action="store_true")
+    p.add_argument("--shap_sample", type=int, default=1000)
 
     # mlflow
     p.add_argument("--experiment_name", type=str, default="MLOps_Lab_1_Fraud")
@@ -87,12 +80,11 @@ def save_confusion_matrix(y_true, y_pred, out_path):
 
 
 def save_feature_importance(model, feature_names, out_path, top_k=15):
-    # RF tree models
+    # Tree models feature_importances_
     if hasattr(model, "feature_importances_"):
         imp = model.feature_importances_
         idx = np.argsort(imp)[::-1][:top_k]
-
-        plt.figure(figsize=(8,4))
+        plt.figure(figsize=(8, 4))
         plt.bar(range(len(idx)), imp[idx])
         plt.xticks(range(len(idx)), [feature_names[i] for i in idx], rotation=60, ha="right")
         plt.title("Top Feature Importances")
@@ -101,13 +93,12 @@ def save_feature_importance(model, feature_names, out_path, top_k=15):
         plt.close()
         return out_path
 
-    # Logistic Regression
+    # Logistic Regression coefficients
     if hasattr(model, "coef_"):
         coefs = model.coef_.ravel()
         imp = np.abs(coefs)
         idx = np.argsort(imp)[::-1][:top_k]
-
-        plt.figure(figsize=(8,4))
+        plt.figure(figsize=(8, 4))
         plt.bar(range(len(idx)), imp[idx])
         plt.xticks(range(len(idx)), [feature_names[i] for i in idx], rotation=60, ha="right")
         plt.title("Top features by |coef|")
@@ -123,7 +114,6 @@ def build_model(args):
     if args.model == "rf":
         cw = None
         if args.imbalance == "class_weight":
-            # better for RF than "balanced" in many cases
             cw = "balanced_subsample"
 
         return RandomForestClassifier(
@@ -131,7 +121,7 @@ def build_model(args):
             max_depth=args.max_depth,
             min_samples_leaf=args.min_samples_leaf,
             class_weight=cw,
-            random_state=args.random_state,
+            random_state=42,
             n_jobs=-1,
         )
 
@@ -153,14 +143,13 @@ def build_model(args):
         except ImportError as e:
             raise ImportError("xgboost is not installed. Run: pip install xgboost") from e
 
-        # scale_pos_weight is often better than SMOTE for XGB, but we keep your requested SMOTE option too
         return XGBClassifier(
             n_estimators=args.n_estimators,
             max_depth=args.max_depth if args.max_depth is not None else 6,
             learning_rate=args.learning_rate,
             subsample=0.9,
             colsample_bytree=0.9,
-            random_state=args.random_state,
+            random_state=42,
             eval_metric="logloss",
             n_jobs=-1,
         )
@@ -175,7 +164,7 @@ def build_model(args):
             n_estimators=args.n_estimators,
             max_depth=args.max_depth if args.max_depth is not None else -1,
             learning_rate=args.learning_rate,
-            random_state=args.random_state,
+            random_state=42,
             n_jobs=-1,
             verbosity=-1,
         )
@@ -188,15 +177,15 @@ def apply_scaling_if_needed(X_train, X_test, scale_cols=("Time", "Amount")):
     X_train = X_train.copy()
     X_test = X_test.copy()
 
-    # Only scale if columns exist
     cols = [c for c in scale_cols if c in X_train.columns]
     if cols:
         X_train.loc[:, cols] = scaler.fit_transform(X_train[cols])
         X_test.loc[:, cols] = scaler.transform(X_test[cols])
+
     return X_train, X_test
 
 
-def apply_smote(X_train, y_train, random_state):
+def apply_smote(X_train, y_train, random_state=42):
     try:
         from imblearn.over_sampling import SMOTE
     except ImportError as e:
@@ -218,9 +207,7 @@ def compute_metrics(y_true, y_pred, y_proba):
 
 
 def tune_threshold_f2(y_true, y_proba):
-    # maximize F2 (recall-weighted)
     precision_vals, recall_vals, thresholds = precision_recall_curve(y_true, y_proba)
-    # last precision/recall has no threshold
     precision_vals = precision_vals[:-1]
     recall_vals = recall_vals[:-1]
 
@@ -229,27 +216,23 @@ def tune_threshold_f2(y_true, y_proba):
     return float(thresholds[best_idx]), float(f2[best_idx])
 
 
-def log_shap_if_requested(args, model, X_test, feature_names):
+def log_shap_if_requested(args, model, X_test):
     if not args.shap:
-        return None
+        return
 
-    # SHAP only makes sense for tree models here
     if args.model not in ["rf", "xgb", "lgbm"]:
-        return None
+        return
 
     try:
         import shap
-    except ImportError:
-        raise ImportError("shap is not installed. Run: pip install shap")
+    except ImportError as e:
+        raise ImportError("shap is not installed. Run: pip install shap") from e
 
-    # small sample for speed
     n = min(args.shap_sample, len(X_test))
-    Xs = X_test.sample(n=n, random_state=args.random_state)
+    Xs = X_test.sample(n=n, random_state=42)
 
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(Xs)
-
-    # handle binary list output
     if isinstance(shap_values, list):
         shap_values = shap_values[1]
 
@@ -260,35 +243,35 @@ def log_shap_if_requested(args, model, X_test, feature_names):
     plt.savefig(out_path, dpi=160)
     plt.close()
     mlflow.log_artifact(out_path)
-    return out_path
 
 
 def main():
     args = parse_args()
 
-    df = pd.read_csv(args.data_path)
-    if args.target not in df.columns:
-        raise ValueError(f"Target '{args.target}' not found in columns")
+    train_df = pd.read_csv(args.train_path)
+    test_df = pd.read_csv(args.test_path)
 
-    X = df.drop(columns=[args.target])
-    y = df[args.target].astype(int)
-    feature_names = X.columns.tolist()
+    if args.target not in train_df.columns:
+        raise ValueError(f"Target '{args.target}' not found in train data")
+    if args.target not in test_df.columns:
+        raise ValueError(f"Target '{args.target}' not found in test data")
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y,
-        test_size=args.test_size,
-        random_state=args.random_state,
-        stratify=y
-    )
+    X_train = train_df.drop(columns=[args.target])
+    y_train = train_df[args.target].astype(int)
 
-    # optional scaling
+    X_test = test_df.drop(columns=[args.target])
+    y_test = test_df[args.target].astype(int)
+
+    feature_names = X_train.columns.tolist()
+
+    # optional scaling (mostly for LR)
     if args.scale_time_amount:
         X_train, X_test = apply_scaling_if_needed(X_train, X_test)
 
-    # imbalance handling: SMOTE must be train-only
+    # imbalance handling
     X_train_used, y_train_used = X_train, y_train
     if args.imbalance == "smote":
-        X_train_used, y_train_used = apply_smote(X_train, y_train, args.random_state)
+        X_train_used, y_train_used = apply_smote(X_train, y_train, random_state=42)
 
     model = build_model(args)
 
@@ -302,13 +285,14 @@ def main():
         mlflow.set_tag("imbalance", args.imbalance)
         mlflow.set_tag("task", "fraud_detection")
 
-        # params
-        mlflow.log_param("test_size", args.test_size)
-        mlflow.log_param("random_state", args.random_state)
+        # params (general)
+        mlflow.log_param("train_path", args.train_path)
+        mlflow.log_param("test_path", args.test_path)
         mlflow.log_param("scale_time_amount", bool(args.scale_time_amount))
         mlflow.log_param("threshold", args.threshold)
         mlflow.log_param("tune_threshold", bool(args.tune_threshold))
 
+        # params (model-specific)
         if args.model == "rf":
             mlflow.log_param("n_estimators", args.n_estimators)
             mlflow.log_param("max_depth", args.max_depth)
@@ -323,34 +307,35 @@ def main():
             mlflow.log_param("max_depth", args.max_depth)
             mlflow.log_param("learning_rate", args.learning_rate)
 
-        # train
+        # train on train_used
         model.fit(X_train_used, y_train_used)
 
-        # probabilities
+        os.makedirs("models", exist_ok=True)
+        joblib.dump(model, "models/model.pkl")
+        mlflow.log_artifact("models/model.pkl")
+
+        # proba: TRAIN metrics computed on train_used, TEST on test
         if hasattr(model, "predict_proba"):
-            proba_train = model.predict_proba(X_train)[:, 1]
+            proba_train = model.predict_proba(X_train_used)[:, 1]
             proba_test = model.predict_proba(X_test)[:, 1]
         else:
-            # fallback (rare here)
-            proba_train = model.decision_function(X_train)
+            proba_train = model.decision_function(X_train_used)
             proba_test = model.decision_function(X_test)
 
-        # optional threshold tuning on TRAIN proba
         used_threshold = args.threshold
         if args.tune_threshold:
-            best_thr, best_f2 = tune_threshold_f2(y_train, proba_train)
+            best_thr, best_f2 = tune_threshold_f2(y_train_used, proba_train)
             used_threshold = best_thr
             mlflow.log_param("best_threshold", best_thr)
             mlflow.log_metric("best_f2_train", best_f2)
 
-        # predictions
         y_pred_train = (proba_train >= used_threshold).astype(int)
         y_pred_test = (proba_test >= used_threshold).astype(int)
 
-        # metrics train + test
-        m_train = compute_metrics(y_train, y_pred_train, proba_train)
+        m_train = compute_metrics(y_train_used, y_pred_train, proba_train)
         m_test = compute_metrics(y_test, y_pred_test, proba_test)
 
+        # metrics
         for k, v in m_train.items():
             mlflow.log_metric(f"{k}_train", float(v))
         for k, v in m_test.items():
@@ -364,15 +349,16 @@ def main():
         if fi_path:
             mlflow.log_artifact(fi_path)
 
-        # SHAP (optional)
-        log_shap_if_requested(args, model, X_test, feature_names)
+        log_shap_if_requested(args, model, X_test)
 
-        # log model
+        # model
         mlflow.sklearn.log_model(model, name="model")
 
         print("Done.")
-        print(f"Test: precision={m_test['precision']:.4f}, recall={m_test['recall']:.4f}, "
-              f"f1={m_test['f1']:.4f}, pr_auc={m_test['pr_auc']:.4f}, roc_auc={m_test['roc_auc']:.4f}")
+        print(
+            f"Test: precision={m_test['precision']:.4f}, recall={m_test['recall']:.4f}, "
+            f"f1={m_test['f1']:.4f}, pr_auc={m_test['pr_auc']:.4f}, roc_auc={m_test['roc_auc']:.4f}"
+        )
         print(f"Used threshold: {used_threshold:.4f}")
 
 

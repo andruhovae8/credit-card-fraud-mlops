@@ -1,0 +1,18 @@
+stages:
+  prepare:
+    cmd: python src/prepare.py --input data/raw/creditcard.csv --out_dir data/prepared --target Class --test_size 0.2 --random_state 42 --add_hour
+    deps:
+      - data/raw/creditcard.csv
+      - src/prepare.py
+    outs:
+      - data/prepared/train.csv
+      - data/prepared/test.csv
+
+  train:
+    cmd: python src/train.py --train_path data/prepared/train.csv --test_path data/prepared/test.csv --target Class --model rf --imbalance none --run_name dvc_rf_baseline --max_depth 9 --n_estimators 300
+    deps:
+      - data/prepared/train.csv
+      - data/prepared/test.csv
+      - src/train.py
+    outs:
+      - models/model.pkl
