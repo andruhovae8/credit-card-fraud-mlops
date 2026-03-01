@@ -1,0 +1,45 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python src/prepare.py --input data/raw/creditcard.csv --out_dir 
+      data/prepared --target Class --test_size 0.2 --random_state 42 --add_hour
+    deps:
+    - path: data/raw/creditcard.csv
+      hash: md5
+      md5: e90efcb83d69faf99fcab8b0255024de
+      size: 150828752
+    - path: src/prepare.py
+      hash: md5
+      md5: a167324b88f69d293ceb3a301290b7a2
+      size: 1662
+    outs:
+    - path: data/prepared/test.csv
+      hash: md5
+      md5: bc19395818a29ceb8e2f75e520e42c6f
+      size: 31152398
+    - path: data/prepared/train.csv
+      hash: md5
+      md5: 74c8c29a9b78345d5d4c7bbb5a26c043
+      size: 124618734
+  train:
+    cmd: python src/train.py --train_path data/prepared/train.csv --test_path 
+      data/prepared/test.csv --target Class --model rf --imbalance none 
+      --run_name dvc_rf_baseline --max_depth 9 --n_estimators 300
+    deps:
+    - path: data/prepared/test.csv
+      hash: md5
+      md5: bc19395818a29ceb8e2f75e520e42c6f
+      size: 31152398
+    - path: data/prepared/train.csv
+      hash: md5
+      md5: 74c8c29a9b78345d5d4c7bbb5a26c043
+      size: 124618734
+    - path: src/train.py
+      hash: md5
+      md5: 7b668a64b1f276e96281209db38e3c0f
+      size: 12409
+    outs:
+    - path: models/model.pkl
+      hash: md5
+      md5: a7db902d199c0bd18fbd91ffbc092f92
+      size: 2708121
