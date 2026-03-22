@@ -1,0 +1,48 @@
+name: CML CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest matplotlib
+
+      - name: Run prepare
+        run: |
+          python src/prepare.py --input data/raw/creditcard.csv --out_dir data/prepared --target Class --test_size 0.2 --random_state 42 --add_hour
+
+      - name: Pre-train tests
+        run: pytest tests/test_pretrain.py
+
+      - name: Train model
+        run: |
+          python src/train_lab4.py --train_path data/prepared/train.csv --test_path data/prepared/test.csv
+
+      - name: Post-train tests
+        run: pytest tests/test_posttrain.py
+
+      - name: Generate report
+        run: |
+          echo "## Model Metrics" >> report.md
+          cat artifacts/metrics.json >> report.md
+
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: report
+          path: report.md

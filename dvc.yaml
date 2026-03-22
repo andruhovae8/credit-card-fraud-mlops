@@ -33,4 +33,14 @@ stages:
       - models_hpo/best_model.pkl
       - reports_hpo/best_params.json
       - reports_hpo/final_config_resolved.yaml
+  train_ci:
+    cmd: python src/train_lab4.py --train_path data/prepared/train.csv --test_path data/prepared/test.csv
+    deps:
+      - src/train_lab4.py
+      - data/prepared/train.csv
+      - data/prepared/test.csv
+    outs:
+      - artifacts/model.pkl
+      - artifacts/metrics.json
+      - artifacts/confusion_matrix.png
 

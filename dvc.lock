@@ -99,3 +99,32 @@ stages:
       hash: md5
       md5: c9f66014cdc2f377c5553d31a19a29c5
       size: 539
+  train_ci:
+    cmd: python src/train_lab4.py --train_path data/prepared/train.csv 
+      --test_path data/prepared/test.csv
+    deps:
+    - path: data/prepared/test.csv
+      hash: md5
+      md5: bc19395818a29ceb8e2f75e520e42c6f
+      size: 31152398
+    - path: data/prepared/train.csv
+      hash: md5
+      md5: 74c8c29a9b78345d5d4c7bbb5a26c043
+      size: 124618734
+    - path: src/train_lab4.py
+      hash: md5
+      md5: ee902690273253cdcf8ea71a72605b5f
+      size: 3754
+    outs:
+    - path: artifacts/confusion_matrix.png
+      hash: md5
+      md5: f3a6d54a44b64521861b2448e6eeecca
+      size: 17258
+    - path: artifacts/metrics.json
+      hash: md5
+      md5: 377e650a434f106e15f917d346fcf35e
+      size: 105
+    - path: artifacts/model.pkl
+      hash: md5
+      md5: 8ba9a14a9a69cc73679ef1a4c3b6ef1f
+      size: 177721
