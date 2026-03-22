@@ -1,0 +1,28 @@
+defaults:
+  - model: rf
+  - hpo: optuna
+
+data:
+  train_path: data/prepared/train.csv
+  test_path: data/prepared/test.csv
+  target: Class
+
+preprocessing:
+  scale_time_amount: false
+  imbalance: none   # none | smote | class_weight
+
+threshold:
+  value: 0.5
+  tune_on_train: false
+
+mlflow:
+  experiment_name: MLOps_Lab_3_HPO
+  parent_run_name: hpo_study
+
+meta:
+  author: student
+  dataset_version: creditcard_v1
+
+hydra:
+  run:
+    dir: .

@@ -1,0 +1,4 @@
+n_trials: 20
+sampler: tpe          # tpe | random
+optimize_metric: pr_auc
+validation_size: 0.2

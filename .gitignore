@@ -8,8 +8,11 @@ venv/
 mlruns/
 mlflow.db
 
-# data
-data/
+# Ignore prepared data and models
+data/prepared/
+models/
+mlflow.db
+mlruns/
 
 # python cache
 __pycache__/
