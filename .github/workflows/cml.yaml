@@ -10,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -19,26 +20,33 @@ jobs:
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest matplotlib
 
-      - name: Run prepare
-        run: |
-          python src/prepare.py --input data/raw/creditcard.csv --out_dir data/prepared --target Class --test_size 0.2 --random_state 42 --add_hour
-
       - name: Pre-train tests
-        run: pytest tests/test_pretrain.py
+        run: |
+          pytest -q tests/test_pretrain.py
 
       - name: Train model
         run: |
-          python src/train_lab4.py --train_path data/prepared/train.csv --test_path data/prepared/test.csv
+          python src/train_lab4.py \
+            --train_path data/ci/train_sample.csv \
+            --test_path data/ci/test_sample.csv \
+            --target Class \
+            --model rf \
+            --max_rows 5000 \
+            --model_out artifacts/model.pkl \
+            --metrics_path artifacts/metrics.json \
+            --cm_path artifacts/confusion_matrix.png
 
       - name: Post-train tests
-        run: pytest tests/test_posttrain.py
+        run: |
+          pytest -q tests/test_posttrain.py
 
       - name: Generate report
         run: |
-          echo "## Model Metrics" >> report.md
+          echo "## Model Metrics" > report.md
           cat artifacts/metrics.json >> report.md
 
       - name: Upload report
