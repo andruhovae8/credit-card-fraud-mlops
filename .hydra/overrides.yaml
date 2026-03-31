@@ -1,1 +1,3 @@
-- hpo.sampler=random
+- model=rf
+- hpo.sampler=tpe
+- hpo.n_trials=20

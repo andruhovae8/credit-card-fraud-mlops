@@ -1,0 +1,12 @@
+apache-airflow==2.9.3
+pandas
+scikit-learn
+joblib
+matplotlib
+numpy
+imbalanced-learn
+xgboost
+lightgbm
+mlflow
+dvc
+psycopg2-binary

@@ -112,11 +112,13 @@ hydra:
     hydra:
     - hydra.mode=RUN
     task:
-    - hpo.sampler=random
+    - model=rf
+    - hpo.sampler=tpe
+    - hpo.n_trials=20
   job:
     name: optimize
     chdir: null
-    override_dirname: hpo.sampler=random
+    override_dirname: hpo.n_trials=20,hpo.sampler=tpe,model=rf
     id: ???
     num: ???
     config_name: config

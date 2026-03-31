@@ -49,7 +49,7 @@ def parse_args():
     p.add_argument("--max_iter", type=int, default=1000)
 
     # XGB / LGBM basic params
-    p.add_argument("--learning_rate", type=float, default=0.1)
+    p.add_argument("--learning_rate", type=float, default=0.2)
 
     # threshold
     p.add_argument("--threshold", type=float, default=0.5,
