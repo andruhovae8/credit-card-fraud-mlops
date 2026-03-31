@@ -32,8 +32,6 @@ docker==7.1.0
 executing==2.2.1
 fastapi==0.129.0
 fastjsonschema==2.21.2
-Flask==3.1.2
-flask-cors==6.0.2
 flake8
 fonttools==4.61.1
 fqdn==1.5.1
