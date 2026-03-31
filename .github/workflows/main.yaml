@@ -10,32 +10,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2. Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      # 3. Base tools 
+      - name: Install base tools
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install flake8 apache-airflow==2.9.3
+          pip install pytest flake8
 
+      # 4. Airflow тільки для DAG test
+      - name: Install Airflow
+        run: |
+          pip install apache-airflow==2.9.3
+
+      # 5. Lint
       - name: Lint
         run: |
           flake8 src scripts dags tests --max-line-length=120
 
+      # 6. DAG integrity test
       - name: DAG integrity test
         run: |
           pytest -q tests/test_dag_import.py
 
+      # 7. Docker build 
       - name: Docker build
         run: |
           docker build -t fraud-mlops-lab5 .
 
+      # 8. smoke run ML
       - name: Smoke train
         run: |
           python scripts/train_for_airflow.py \

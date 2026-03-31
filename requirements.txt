@@ -9,7 +9,6 @@ arrow==1.4.0
 asttokens==3.0.1
 async-lru==2.1.0
 attrs==25.4.0
-apache-airflow==2.9.3
 babel==2.18.0
 beautifulsoup4==4.14.3
 bleach==6.3.0
